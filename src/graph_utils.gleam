@@ -82,5 +82,11 @@ pub fn to_string(graph: graph.Graph(key, value, label)) -> String {
         })
       #(current_string <> append_to_string, next_lone_vertices)
     })
+  list.fold(lone_vertices, "", fn(lone_vertices_string, current_lone_vertex) {
+    lone_vertices_string
+    <> "\n"
+    <> string.inspect(current_lone_vertex.key)
+    <> "\n"
+  })
   edges_string
 }

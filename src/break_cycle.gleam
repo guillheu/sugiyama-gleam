@@ -1,7 +1,6 @@
 import aonyx/graph.{type Graph}
 import aonyx/graph/edge
 import aonyx/graph/node
-import gleam/dict.{type Dict}
 import gleam/int
 import gleam/list
 import gleam/order

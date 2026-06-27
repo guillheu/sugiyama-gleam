@@ -1,7 +1,6 @@
 import aonyx/graph
 import aonyx/graph/edge
 import aonyx/graph/node
-import gleam/io
 import gleam/list
 import gleeunit
 import graph_utils
