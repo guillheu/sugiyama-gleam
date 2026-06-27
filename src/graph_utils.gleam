@@ -4,6 +4,7 @@ import aonyx/graph/node
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/result
+import gleam/string
 
 pub fn reverse_edge(e: edge.Edge(key, label)) -> edge.Edge(key, label) {
   edge.new(e.to, e.from)
@@ -33,26 +34,6 @@ pub fn reverse_edge_in(
   final_graph
 }
 
-pub fn has_cycles(graph: graph.Graph(key, value, label)) {
-  has_cycles_recurse(graph.get_nodes(graph), graph, [])
-}
-
-fn has_cycles_recurse(eval_next, graph, checked_nodes) -> Bool {
-  case eval_next {
-    [first, ..rest] -> {
-      let cycle_detected =
-        transitions_from_node(graph, first)
-        |> list.any(fn(next_node) { list.contains(checked_nodes, next_node) })
-      case cycle_detected, rest {
-        True, _ -> True
-        False, [] -> False
-        False, rest -> has_cycles_recurse(rest, graph, [first, ..checked_nodes])
-      }
-    }
-    [] -> False
-  }
-}
-
 pub fn transitions_from_node(
   in: graph.Graph(key, value, label),
   from: node.Node(key, value),
@@ -64,4 +45,42 @@ pub fn transitions_from_node(
       False -> Error(Nil)
     }
   })
+}
+
+pub fn get_incoming_edges(
+  vertex: node.Node(key, value),
+  edges: List(edge.Edge(key, label)),
+) -> List(edge.Edge(key, label)) {
+  list.filter(edges, fn(edge) { edge.to == vertex.key })
+}
+
+pub fn get_outgoing_edges(
+  vertex: node.Node(key, value),
+  edges: List(edge.Edge(key, label)),
+) -> List(edge.Edge(key, label)) {
+  list.filter(edges, fn(edge) { edge.from == vertex.key })
+}
+
+pub fn to_string(graph: graph.Graph(key, value, label)) -> String {
+  let vertices = graph.get_nodes(graph)
+  let edges = graph.get_edges(graph)
+  let #(edges_string, lone_vertices) =
+    list.fold(edges, #("", vertices), fn(acc, current_edge) {
+      let #(current_string, current_lone_vertices) = acc
+      let append_to_string =
+        "\n"
+        <> string.inspect(current_edge.from)
+        <> " == "
+        <> string.inspect(current_edge.label)
+        <> " => "
+        <> string.inspect(current_edge.to)
+        <> "\n"
+      let next_lone_vertices =
+        list.filter(current_lone_vertices, fn(lone_vertex) {
+          current_edge.from == lone_vertex.key
+          || current_edge.to == lone_vertex.key
+        })
+      #(current_string <> append_to_string, next_lone_vertices)
+    })
+  edges_string
 }
