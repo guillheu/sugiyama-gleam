@@ -4,6 +4,7 @@ import aonyx/graph/node
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/result
+import gleam/set
 import gleam/string
 
 pub fn reverse_edge(e: edge.Edge(key, label)) -> edge.Edge(key, label) {
@@ -67,6 +68,9 @@ pub fn to_string(graph: graph.Graph(key, value, label)) -> String {
   let #(edges_string, lone_vertices) =
     list.fold(edges, #("", vertices), fn(acc, current_edge) {
       let #(current_string, current_lone_vertices) = acc
+      let assert Ok(from_vertex) = graph.get_node(graph, current_edge.from)
+      let assert Ok(to_vertex) = graph.get_node(graph, current_edge.to)
+
       let append_to_string =
         "\n"
         <> string.inspect(current_edge.from)
@@ -75,6 +79,9 @@ pub fn to_string(graph: graph.Graph(key, value, label)) -> String {
         <> " => "
         <> string.inspect(current_edge.to)
         <> "\n"
+        <> string.inspect(from_vertex.value)
+        <> "\t"
+        <> string.inspect(to_vertex.value)
       let next_lone_vertices =
         list.filter(current_lone_vertices, fn(lone_vertex) {
           current_edge.from == lone_vertex.key
@@ -89,4 +96,11 @@ pub fn to_string(graph: graph.Graph(key, value, label)) -> String {
     <> "\n"
   })
   edges_string
+}
+
+pub fn get_sources(
+  graph: graph.Graph(key, value, label),
+) -> List(node.Node(key, value)) {
+  graph.get_nodes(graph)
+  |> list.filter(fn(vertex) { vertex.incoming |> set.is_empty })
 }

@@ -1,8 +1,12 @@
 import aonyx/graph
 import aonyx/graph/node
+import break_cycle
+import gleam/io
 import gleam/list
 import gleam/result
 import gleam/set
+import graph_utils
+import layering
 
 pub fn apply(
   graph: graph.Graph(key, value, label),
@@ -28,4 +32,15 @@ pub fn apply(
     graph.try_insert_edge(graph, edge)
     |> result.lazy_unwrap(fn() { panic as "missing node" })
   })
+}
+
+pub fn run(
+  graph: graph.Graph(key, value, label),
+) -> graph.Graph(key, #(value, Int, Int), label) {
+  graph
+  |> break_cycle.berger_shor
+  |> layering.minimize_number_of_layers
+  |> graph_utils.to_string
+  |> io.println
+  todo
 }
