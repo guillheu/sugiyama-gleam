@@ -1,22 +1,25 @@
 import aonyx/graph
 import aonyx/graph/edge
 import aonyx/graph/node
+import gleam/io
 import gleam/list
 import gleam/option
+import gleam/set
 import graph_utils
 
-type VertexType(key) {
+pub type VertexType(key) {
   Real(inner: key)
   Virtual(from: key, to: key, index: Int)
 }
 
 pub fn minimize(
   graph: graph.Graph(key, #(value, Int), label),
-) -> graph.Graph(key, #(value, Int, Int), label) {
+  // ) -> graph.Graph(key, #(value, Int, Int), label) {
+) {
   // 1: add dummy nodes for edges that jump more than 1 layer
-  let graph_with_virtual_vertices =
+  let #(virtual_vertices, virtual_edges) =
     graph.get_edges(graph)
-    |> list.fold(graph.new(), fn(current_graph, current_edge) {
+    |> list.fold(#(set.new(), set.new()), fn(current_graph, current_edge) {
       let assert Ok(from_vertex) = graph.get_node(graph, current_edge.from)
       edge_to_dummy_vertices(
         current_graph,
@@ -25,16 +28,41 @@ pub fn minimize(
         graph,
       )
     })
-    |> graph_utils.to_string
-  todo
+
+  let graph_with_vertices =
+    set.fold(virtual_vertices, graph.new(), fn(current_graph, current_vertex) {
+      graph.insert_node(current_graph, current_vertex)
+    })
+  let complete_graph =
+    set.fold(
+      virtual_edges,
+      graph_with_vertices,
+      fn(current_graph, current_edge) {
+        let assert Ok(next_graph) =
+          graph.try_insert_edge(current_graph, current_edge)
+        next_graph
+      },
+    )
+
+  complete_graph
+  //   |> graph_utils.to_string
+  //   |> io.println
+  //   todo
 }
 
 fn edge_to_dummy_vertices(
-  graph: graph.Graph(VertexType(key), #(value, Int), label),
+  current_nodes_and_edges: #(
+    set.Set(node.Node(VertexType(key), #(value, Int))),
+    set.Set(edge.Edge(VertexType(key), label)),
+  ),
   edge: edge.Edge(key, label),
   default_value: value,
   reference_graph: graph.Graph(key, #(value, Int), label),
-) -> graph.Graph(VertexType(key), #(value, Int), label) {
+) -> #(
+  set.Set(node.Node(VertexType(key), #(value, Int))),
+  set.Set(edge.Edge(VertexType(key), label)),
+) {
+  let #(current_nodes, current_edges) = current_nodes_and_edges
   let assert Ok(from) = graph.get_node(reference_graph, edge.from)
   let assert Ok(to) = graph.get_node(reference_graph, edge.to)
   let from_layer = from.value.1
@@ -50,24 +78,32 @@ fn edge_to_dummy_vertices(
         #(default_value, current_vertex_layer),
       )
     })
-  let virtual_edges =
-    list.window_by_2(virtual_vertices)
+
+  let split_edges =
+    list.append(
+      [
+        node.Node(Real(from.key), from.value, set.new(), set.new()),
+        ..virtual_vertices
+      ],
+      [node.Node(Real(to.key), to.value, set.new(), set.new())],
+    )
+    |> list.window_by_2
     |> list.map(fn(virtual_pair) {
       let #(from_virtual, to_virtual) = virtual_pair
       edge.Edge(from_virtual.key, to_virtual.key, edge.label, edge.weight)
     })
 
-  let new_graph_with_nodes =
-    list.fold(virtual_vertices, graph, fn(graph, virtual_vertex) {
-      graph.insert_node(graph, virtual_vertex)
-    })
-  list.fold(
-    virtual_edges,
-    new_graph_with_nodes,
-    fn(current_graph, virtual_edge) {
-      let assert Ok(next_graph) =
-        graph.try_insert_edge(current_graph, virtual_edge)
-      next_graph
-    },
-  )
+  let new_nodes =
+    virtual_vertices
+    |> set.from_list
+    |> set.insert(node.new(Real(from.key), from.value))
+    |> set.insert(node.new(Real(to.key), to.value))
+    |> set.union(current_nodes)
+
+  let new_edges =
+    split_edges
+    |> set.from_list
+    |> set.union(current_edges)
+
+  #(new_nodes, new_edges)
 }

@@ -7,6 +7,7 @@ import gleam/result
 import gleam/set
 import graph_utils
 import layering
+import minimize_crossings
 
 pub fn apply(
   graph: graph.Graph(key, value, label),
@@ -37,9 +38,15 @@ pub fn apply(
 pub fn run(
   graph: graph.Graph(key, value, label),
 ) -> graph.Graph(key, #(value, Int, Int), label) {
-  graph
-  |> break_cycle.berger_shor
-  |> layering.minimize_number_of_layers
+  let layered =
+    graph
+    |> break_cycle.berger_shor
+    |> layering.minimize_number_of_layers
+  let minimized =
+    layered
+    |> minimize_crossings.minimize
+
+  minimized
   |> graph_utils.to_string
   |> io.println
   todo
