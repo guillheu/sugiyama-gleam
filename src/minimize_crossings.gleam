@@ -1,6 +1,8 @@
 import aonyx/graph
 import aonyx/graph/edge
 import aonyx/graph/node
+import gleam/dict
+import gleam/int
 import gleam/io
 import gleam/list
 import gleam/option
@@ -29,22 +31,30 @@ pub fn minimize(
       )
     })
 
-  let graph_with_vertices =
-    set.fold(virtual_vertices, graph.new(), fn(current_graph, current_vertex) {
-      graph.insert_node(current_graph, current_vertex)
-    })
-  let complete_graph =
-    set.fold(
-      virtual_edges,
-      graph_with_vertices,
-      fn(current_graph, current_edge) {
-        let assert Ok(next_graph) =
-          graph.try_insert_edge(current_graph, current_edge)
-        next_graph
-      },
-    )
+  // 2. derive a list of layers from the bottom up. Each layer contains a set of nodes and a set of edges.
+  let layered_vertices =
+    set.fold(virtual_vertices, dict.new(), fn(current_layers, current_vertex) {
+      let current_vertex_layer = current_vertex.value.1
 
-  complete_graph
+      let new_layered_vertices = case
+        dict.get(current_layers, current_vertex_layer)
+      {
+        Ok(layered_vertices) -> set.insert(layered_vertices, current_vertex)
+        Error(_) -> set.from_list([current_vertex])
+      }
+
+      dict.insert(current_layers, current_vertex_layer, new_layered_vertices)
+    })
+    |> dict.to_list
+    |> list.sort(fn(layer_left, layer_right) {
+      int.compare(layer_left.0, layer_right.0)
+    })
+    |> list.map(fn(layer) { layer.1 })
+
+  // when evaluating each layer, compare it to the layer below (the "fixed" layer)
+  // This means evaluating the first layer against an empty layer.
+
+  todo
   //   |> graph_utils.to_string
   //   |> io.println
   //   todo
