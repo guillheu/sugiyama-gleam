@@ -16,8 +16,8 @@ pub type VertexType(key) {
 
 pub fn minimize(
   graph: graph.Graph(key, #(value, Int), label),
-  // ) -> graph.Graph(key, #(value, Int, Int), label) {
-) {
+) -> graph.Graph(VertexType(key), #(value, Int, Int), label) {
+  // ) {
   // 1: add dummy nodes for edges that jump more than 1 layer
   let #(virtual_vertices, virtual_edges) =
     graph.get_edges(graph)
@@ -49,15 +49,64 @@ pub fn minimize(
     |> list.sort(fn(layer_left, layer_right) {
       int.compare(layer_left.0, layer_right.0)
     })
-    |> list.map(fn(layer) { layer.1 })
+    |> list.map(fn(layer) { layer.1 |> set.to_list })
 
+  let ordered_layers =
+    [[], ..layered_vertices]
+    |> iterate_through_layer_pairs([])
+
+  let graph_with_positionned_vertices =
+    {
+      use layer <- list.map(ordered_layers)
+      use vertex, index <- list.index_map(layer)
+      node.Node(..vertex, value: #(vertex.value.0, vertex.value.1, index))
+    }
+    |> list.flatten
+    |> list.fold(graph.new(), fn(current_graph, current_vertex) {
+      graph.insert_node(current_graph, current_vertex)
+    })
+
+  set.fold(
+    virtual_edges,
+    graph_with_positionned_vertices,
+    fn(current_graph, current_edge) {
+      let assert Ok(next_graph) =
+        graph.try_insert_edge(current_graph, current_edge)
+      next_graph
+    },
+  )
   // when evaluating each layer, compare it to the layer below (the "fixed" layer)
   // This means evaluating the first layer against an empty layer.
 
-  todo
   //   |> graph_utils.to_string
   //   |> io.println
   //   todo
+}
+
+fn iterate_through_layer_pairs(
+  current_layers: List(List(node.Node(VertexType(key), #(value, Int)))),
+  accumulator: List(List(node.Node(VertexType(key), #(value, Int)))),
+) -> List(List(node.Node(VertexType(key), #(value, Int)))) {
+  case current_layers {
+    [fixed_layer, current_layer, ..rest] -> {
+      let current_layer_ordered = order_layer_pair(fixed_layer, current_layer)
+      let next_accumulator = [current_layer_ordered, ..accumulator]
+      iterate_through_layer_pairs(
+        [current_layer_ordered, ..rest],
+        next_accumulator,
+      )
+    }
+    [_] -> accumulator
+    [] ->
+      panic as "there should never be a case with no layers remaining - when we reach 1 layer the recursion should end"
+  }
+}
+
+fn order_layer_pair(
+  fixed_layer: List(node.Node(VertexType(key), #(value, Int))),
+  current_layer: List(node.Node(VertexType(key), #(value, Int))),
+) -> List(node.Node(VertexType(key), #(value, Int))) {
+  todo
 }
 
 fn edge_to_dummy_vertices(
