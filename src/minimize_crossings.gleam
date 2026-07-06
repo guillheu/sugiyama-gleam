@@ -2,6 +2,7 @@ import aonyx/graph
 import aonyx/graph/edge
 import aonyx/graph/node
 import gleam/dict
+import gleam/float
 import gleam/int
 import gleam/io
 import gleam/list
@@ -56,13 +57,10 @@ pub fn minimize(
     |> iterate_through_layer_pairs([])
 
   let graph_with_positionned_vertices =
-    {
-      use layer <- list.map(ordered_layers)
-      use vertex, index <- list.index_map(layer)
-      node.Node(..vertex, value: #(vertex.value.0, vertex.value.1, index))
-    }
+    list.map(ordered_layers, dict.to_list)
     |> list.flatten
     |> list.fold(graph.new(), fn(current_graph, current_vertex) {
+      let #(_, current_vertex) = current_vertex
       graph.insert_node(current_graph, current_vertex)
     })
 
@@ -85,28 +83,31 @@ pub fn minimize(
 
 fn iterate_through_layer_pairs(
   current_layers: List(List(node.Node(VertexType(key), #(value, Int)))),
-  accumulator: List(List(node.Node(VertexType(key), #(value, Int)))),
-) -> List(List(node.Node(VertexType(key), #(value, Int)))) {
+  accumulator: List(
+    dict.Dict(VertexType(key), node.Node(VertexType(key), #(value, Int, Int))),
+  ),
+) -> List(
+  dict.Dict(VertexType(key), node.Node(VertexType(key), #(value, Int, Int))),
+) {
   case current_layers {
-    [fixed_layer, current_layer, ..rest] -> {
+    [current_layer, ..rest] -> {
+      let assert Ok(fixed_layer) = list.first(accumulator)
       let current_layer_ordered = order_layer_pair(fixed_layer, current_layer)
       let next_accumulator = [current_layer_ordered, ..accumulator]
-      iterate_through_layer_pairs(
-        [current_layer_ordered, ..rest],
-        next_accumulator,
-      )
+      iterate_through_layer_pairs(rest, next_accumulator)
     }
-    [_] -> accumulator
-    [] ->
-      panic as "there should never be a case with no layers remaining - when we reach 1 layer the recursion should end"
+    [] -> accumulator
   }
 }
 
 fn order_layer_pair(
-  fixed_layer: List(node.Node(VertexType(key), #(value, Int))),
+  fixed_layer: dict.Dict(
+    VertexType(key),
+    node.Node(VertexType(key), #(value, Int, Int)),
+  ),
   current_layer: List(node.Node(VertexType(key), #(value, Int))),
-) -> List(node.Node(VertexType(key), #(value, Int))) {
-  todo
+) -> dict.Dict(VertexType(key), node.Node(VertexType(key), #(value, Int, Int))) {
+  let neighbors_median_in_fixed_layer = todo
 }
 
 fn edge_to_dummy_vertices(

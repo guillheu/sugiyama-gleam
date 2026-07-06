@@ -37,7 +37,7 @@ pub fn apply(
 
 pub fn run(
   graph: graph.Graph(key, value, label),
-) -> graph.Graph(key, #(value, Int, Int), label) {
+) -> graph.Graph(minimize_crossings.VertexType(key), #(value, Int, Int), label) {
   let layered =
     graph
     |> break_cycle.berger_shor
