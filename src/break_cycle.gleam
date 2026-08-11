@@ -22,7 +22,7 @@ pub fn berger_shor(g: Graph(key, value, label)) -> Graph(key, value, label) {
 
   //4: G = (V, E') is a DAG
   // E \ E' is the "feedback set" (edges to be inverted)
-  let graph_only_vertices = echo list.fold(edges, g, graph.remove_edge)
+  let graph_only_vertices = list.fold(edges, g, graph.remove_edge)
   list.fold(all_edges, graph_only_vertices, fn(edge_to_insert, graph) {
     let assert Ok(graph) = graph.try_insert_edge(edge_to_insert, graph)
     graph

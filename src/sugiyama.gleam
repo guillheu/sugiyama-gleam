@@ -1,11 +1,10 @@
 import aonyx/graph
 import aonyx/graph/node
 import break_cycle
-import gleam/io
+import coordinates
 import gleam/list
 import gleam/result
 import gleam/set
-import graph_utils
 import layering
 import minimize_crossings
 
@@ -35,19 +34,26 @@ pub fn apply(
   })
 }
 
+/// Lay out `graph` with the Sugiyama method.
+///
+/// The classic phases are applied in order:
+///
+/// 1. break cycles so the graph becomes a DAG (`break_cycle.berger_shor`),
+/// 2. assign every vertex to a layer (`layering.minimize_number_of_layers`),
+/// 3. order vertices within each layer to reduce crossings, splitting long
+///    edges with virtual vertices (`minimize_crossings.minimize`),
+/// 4. turn those in-layer orderings into x-coordinates that align neighbors
+///    and straighten edges (`coordinates.straighten`).
+///
+/// Every vertex in the returned graph carries a `#(value, layer, x)` triple:
+/// `layer` is its row (0 at the top) and `x` its horizontal coordinate.
+/// Long edges are routed through `Virtual` vertices.
 pub fn run(
   graph: graph.Graph(key, value, label),
 ) -> graph.Graph(minimize_crossings.VertexType(key), #(value, Int, Int), label) {
-  let layered =
-    graph
-    |> break_cycle.berger_shor
-    |> layering.minimize_number_of_layers
-  let minimized =
-    layered
-    |> minimize_crossings.minimize
-
-  minimized
-  |> graph_utils.to_string
-  |> io.println
-  todo
+  graph
+  |> break_cycle.berger_shor
+  |> layering.minimize_number_of_layers
+  |> minimize_crossings.minimize
+  |> coordinates.straighten
 }

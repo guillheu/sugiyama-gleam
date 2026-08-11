@@ -1,7 +1,6 @@
 import aonyx/graph
 import aonyx/graph/edge
 import aonyx/graph/node
-import gleam/io
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/result
@@ -104,9 +103,6 @@ pub fn to_string(graph: graph.Graph(key, value, label)) -> String {
 pub fn get_sources(
   graph: graph.Graph(key, value, label),
 ) -> List(node.Node(key, value)) {
-  graph
-  |> to_string
-  |> io.println
   graph.get_nodes(graph)
-  |> list.filter(fn(vertex) { vertex.incoming |> echo |> set.is_empty })
+  |> list.filter(fn(vertex) { set.is_empty(vertex.incoming) })
 }
