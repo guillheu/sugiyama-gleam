@@ -34,6 +34,9 @@ pub fn apply(
   })
 }
 
+pub type VertexType(key) =
+  minimize_crossings.VertexType(key)
+
 /// Lay out `graph` with the Sugiyama method.
 ///
 /// The classic phases are applied in order:
@@ -50,7 +53,7 @@ pub fn apply(
 /// Long edges are routed through `Virtual` vertices.
 pub fn run(
   graph: graph.Graph(key, value, label),
-) -> graph.Graph(minimize_crossings.VertexType(key), #(value, Int, Int), label) {
+) -> graph.Graph(VertexType(key), #(value, Int, Int), label) {
   graph
   |> break_cycle.berger_shor
   |> layering.minimize_number_of_layers
