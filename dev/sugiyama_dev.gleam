@@ -5,10 +5,17 @@ import gleam/dict
 import gleam/int
 import gleam/io
 import gleam/list
+import gleam/option
 import gleam/result
 import gleam/string
-import minimize_crossings.{type VertexType, Real, Virtual}
 import sugiyama
+
+type Laid =
+  graph.Graph(
+    String,
+    #(String, Int, Int),
+    #(option.Option(String), List(#(Int, Int))),
+  )
 
 pub fn main() {
   get_cyclic_graph()
@@ -17,10 +24,9 @@ pub fn main() {
 }
 
 // Print the laid-out graph as rows of `key@x` entries, one row per layer,
-// sorted left-to-right by the assigned x-coordinate.
-fn print_layout(
-  laid_out: graph.Graph(VertexType(String), #(String, Int, Int), String),
-) -> Nil {
+// sorted left-to-right by the assigned x-coordinate, then list every edge
+// with its curve waypoints.
+fn print_layout(laid_out: Laid) -> Nil {
   let by_layer =
     graph.get_nodes(laid_out)
     |> list.fold(dict.new(), fn(acc, n) {
@@ -35,18 +41,26 @@ fn print_layout(
     let row =
       result.unwrap(dict.get(by_layer, layer), [])
       |> list.sort(fn(a, b) { int.compare(a.1, b.1) })
-      |> list.map(fn(entry) { label(entry.0) <> "@" <> int.to_string(entry.1) })
+      |> list.map(fn(entry) { entry.0 <> "@" <> int.to_string(entry.1) })
       |> string.join(with: "  ")
     io.println("layer " <> int.to_string(layer) <> ": " <> row)
   })
-}
 
-fn label(vertex: VertexType(String)) -> String {
-  case vertex {
-    Real(key) -> key
-    Virtual(from, to, index) ->
-      "(" <> from <> "->" <> to <> ":" <> int.to_string(index) <> ")"
-  }
+  io.println("")
+  graph.get_edges(laid_out)
+  |> list.each(fn(e) {
+    let waypoints = case e.label {
+      option.Some(#(_label, points)) -> points
+      option.None -> []
+    }
+    let points_string =
+      waypoints
+      |> list.map(fn(p) {
+        "(" <> int.to_string(p.0) <> "," <> int.to_string(p.1) <> ")"
+      })
+      |> string.join(with: " ")
+    io.println(e.from <> " -> " <> e.to <> ": [" <> points_string <> "]")
+  })
 }
 
 fn get_acyclic_graph() -> graph.Graph(String, String, String) {

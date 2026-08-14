@@ -1,8 +1,10 @@
 import aonyx/graph
 import aonyx/graph/node
 import break_cycle
+import control_points
 import coordinates
 import gleam/list
+import gleam/option
 import gleam/result
 import gleam/set
 import layering
@@ -46,17 +48,27 @@ pub type VertexType(key) =
 /// 3. order vertices within each layer to reduce crossings, splitting long
 ///    edges with virtual vertices (`minimize_crossings.minimize`),
 /// 4. turn those in-layer orderings into x-coordinates that align neighbors
-///    and straighten edges (`coordinates.straighten`).
+///    and straighten edges (`coordinates.straighten`),
+/// 5. collapse the virtual-vertex chains back into edges, attaching each
+///    chain's coordinates to the edge as curve waypoints (`control_points.route`).
 ///
 /// Every vertex in the returned graph carries a `#(value, layer, x)` triple:
-/// `layer` is its row (0 at the top) and `x` its horizontal coordinate.
-/// Long edges are routed through `Virtual` vertices.
+/// `layer` is its row (0 at the top) and `x` its horizontal coordinate. The
+/// scaffolding `Virtual` vertices are gone; instead each edge's label is
+/// `#(original_label, waypoints)`, where `waypoints` is the ordered list of
+/// `#(x, y)` points (source -> target, `y` being the layer index) that a
+/// long edge was routed through. Short edges carry an empty list.
 pub fn run(
   graph: graph.Graph(key, value, label),
-) -> graph.Graph(VertexType(key), #(value, Int, Int), label) {
+) -> graph.Graph(
+  key,
+  #(value, Int, Int),
+  #(option.Option(label), List(#(Int, Int))),
+) {
   graph
   |> break_cycle.berger_shor
   |> layering.minimize_number_of_layers
   |> minimize_crossings.minimize
   |> coordinates.straighten
+  |> control_points.route
 }
