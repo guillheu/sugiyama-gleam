@@ -14,7 +14,7 @@ type Laid =
   graph.Graph(
     String,
     #(String, Int, Int),
-    #(option.Option(String), List(#(Int, Int))),
+    #(option.Option(String), #(#(Int, Int), #(Int, Int))),
   )
 
 pub fn main() {
@@ -25,7 +25,7 @@ pub fn main() {
 
 // Print the laid-out graph as rows of `key@x` entries, one row per layer,
 // sorted left-to-right by the assigned x-coordinate, then list every edge
-// with its curve waypoints.
+// with its two curve control points.
 fn print_layout(laid_out: Laid) -> Nil {
   let by_layer =
     graph.get_nodes(laid_out)
@@ -49,18 +49,17 @@ fn print_layout(laid_out: Laid) -> Nil {
   io.println("")
   graph.get_edges(laid_out)
   |> list.each(fn(e) {
-    let waypoints = case e.label {
-      option.Some(#(_label, points)) -> points
-      option.None -> []
+    let points_string = case e.label {
+      option.Some(#(_label, #(c1, c2))) ->
+        string.join([point_string(c1), point_string(c2)], with: " ")
+      option.None -> ""
     }
-    let points_string =
-      waypoints
-      |> list.map(fn(p) {
-        "(" <> int.to_string(p.0) <> "," <> int.to_string(p.1) <> ")"
-      })
-      |> string.join(with: " ")
     io.println(e.from <> " -> " <> e.to <> ": [" <> points_string <> "]")
   })
+}
+
+fn point_string(point: #(Int, Int)) -> String {
+  "(" <> int.to_string(point.0) <> "," <> int.to_string(point.1) <> ")"
 }
 
 fn get_acyclic_graph() -> graph.Graph(String, String, String) {

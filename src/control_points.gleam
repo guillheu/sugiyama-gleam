@@ -13,14 +13,16 @@ import minimize_crossings.{type VertexType, Real, Virtual}
 //
 // Crossing-minimization and coordinate assignment route every long edge
 // through a chain of `Virtual` vertices, one per intermediate layer. Here
-// we drop those vertices from the node set and instead attach their
-// coordinates to the edge that spawned them, as an ordered list of
-// waypoints (`#(x, y)`, source -> target, where `y` is the layer index).
-// A renderer can draw the edge as a smooth curve through those points;
-// a short edge (no virtuals) simply carries an empty list.
+// we drop those vertices from the node set and instead condense their
+// coordinates into the two control points of a cubic curve for the edge
+// that spawned them: the first and the last vertex of the chain, as
+// `#(x, y)` (where `y` is the layer index). A renderer can draw every edge
+// as `source -> c1 -> c2 -> target` with no special-casing; a short edge
+// (no virtuals) gets the points a third and two thirds of the way along
+// the straight line between its endpoints, so it stays visually straight.
 //
 // The original edge label and weight are preserved: the label becomes
-// `#(original_label, waypoints)` and the weight is copied verbatim.
+// `#(original_label, #(c1, c2))` and the weight is copied verbatim.
 
 type Laid(key, value, label) =
   graph.Graph(VertexType(key), #(value, Int, Int), label)
@@ -29,18 +31,19 @@ pub type Routed(key, value, label) =
   graph.Graph(
     key,
     #(value, Int, Int),
-    #(option.Option(label), List(#(Int, Int))),
+    #(option.Option(label), #(#(Int, Int), #(Int, Int))),
   )
 
 pub fn route(g: Laid(key, value, label)) -> Routed(key, value, label) {
   let nodes = graph.get_nodes(g)
-  let waypoints = waypoint_index(nodes)
+  let chains = chain_index(nodes)
+  let positions = position_index(nodes)
 
   let with_nodes =
     list.fold(nodes, graph.new(), fn(acc, n) {
       case n.key {
         Real(k) -> graph.insert_node(acc, node.new(k, n.value))
-        // Virtual vertices are scaffolding; they become edge waypoints.
+        // Virtual vertices are scaffolding; they become edge control points.
         Virtual(..) -> acc
       }
     })
@@ -49,25 +52,73 @@ pub fn route(g: Laid(key, value, label)) -> Routed(key, value, label) {
   |> list.fold(with_nodes, fn(acc, e) {
     case e.from {
       // Interior chain edges (leaving a virtual vertex) are folded into
-      // their edge's waypoint list, so we skip them here.
+      // their edge's control points, so we skip them here.
       Virtual(..) -> acc
       Real(from_key) -> {
-        let #(to_key, points) = case e.to {
+        let #(to_key, chain) = case e.to {
           Real(to) -> #(to, [])
           Virtual(from, to, _) -> #(
             to,
-            result.unwrap(dict.get(waypoints, #(from, to)), []),
+            result.unwrap(dict.get(chains, #(from, to)), []),
           )
         }
-        insert_edge(acc, from_key, to_key, #(e.label, points), e.weight)
+        let controls = controls(positions, from_key, to_key, chain)
+        insert_edge(acc, from_key, to_key, #(e.label, controls), e.weight)
       }
     }
   })
 }
 
+// The two control points for an edge: the ends of its virtual-vertex
+// chain, or — for a short edge, which has no chain — two points spaced
+// evenly along the straight line joining its endpoints.
+fn controls(
+  positions: dict.Dict(key, #(Int, Int)),
+  from: key,
+  to: key,
+  chain: List(#(Int, Int)),
+) -> #(#(Int, Int), #(Int, Int)) {
+  case chain {
+    [first, ..rest] -> #(first, result.unwrap(list.last(rest), first))
+    [] -> {
+      let assert Ok(#(from_x, from_y)) = dict.get(positions, from)
+      let assert Ok(#(to_x, to_y)) = dict.get(positions, to)
+      #(
+        #(thirds(from_x, to_x, 1), thirds(from_y, to_y, 1)),
+        #(thirds(from_x, to_x, 2), thirds(from_y, to_y, 2)),
+      )
+    }
+  }
+}
+
+// `count` thirds of the way from `a` to `b`, rounded to the nearest integer.
+fn thirds(a: Int, b: Int, count: Int) -> Int {
+  let delta = { b - a } * count
+  case delta >= 0 {
+    True -> a + { delta + 1 } / 3
+    False -> a - { 1 - delta } / 3
+  }
+}
+
+// Where each real vertex sits, as an `#(x, y)` point.
+fn position_index(
+  nodes: List(node.Node(VertexType(key), #(value, Int, Int))),
+) -> dict.Dict(key, #(Int, Int)) {
+  nodes
+  |> list.fold(dict.new(), fn(acc, n) {
+    case n.key {
+      Real(key) -> {
+        let #(_, layer, x) = n.value
+        dict.insert(acc, key, #(x, layer))
+      }
+      Virtual(..) -> acc
+    }
+  })
+}
+
 // Group the virtual vertices of every long edge by its `#(from, to)`
-// endpoints, ordered by chain index, as `#(x, y)` waypoints.
-fn waypoint_index(
+// endpoints, ordered by chain index, as `#(x, y)` points.
+fn chain_index(
   nodes: List(node.Node(VertexType(key), #(value, Int, Int))),
 ) -> dict.Dict(#(key, key), List(#(Int, Int))) {
   nodes
@@ -92,7 +143,7 @@ fn insert_edge(
   g: Routed(key, value, label),
   from: key,
   to: key,
-  label: #(option.Option(label), List(#(Int, Int))),
+  label: #(option.Option(label), #(#(Int, Int), #(Int, Int))),
   weight: option.Option(Float),
 ) -> Routed(key, value, label) {
   let new_edge =

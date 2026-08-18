@@ -26,7 +26,7 @@ type Laid =
   graph.Graph(
     String,
     #(String, Int, Int),
-    #(option.Option(String), List(#(Int, Int))),
+    #(option.Option(String), #(#(Int, Int), #(Int, Int))),
   )
 
 fn layers(laid_out: Laid) -> dict.Dict(Int, List(#(String, Int))) {
@@ -49,25 +49,36 @@ pub fn no_overlap_within_layer_test() {
   })
 }
 
-// The waypoints routing the long A -> D edge should all share one
-// x-coordinate, i.e. the long edge is drawn as a straight vertical line.
+// The control points of the long A -> D edge should share one x-coordinate
+// with its endpoints, i.e. the long edge is drawn as a straight vertical line.
 pub fn long_edge_is_straight_test() {
   let laid_out = sugiyama.run(get_graph())
+  let positions =
+    graph.get_nodes(laid_out)
+    |> list.fold(dict.new(), fn(acc, n) {
+      let #(_, layer, x) = n.value
+      dict.insert(acc, n.key, #(x, layer))
+    })
 
   // The long edge (A -> D, possibly reversed by cycle-breaking) is the only
-  // one that spans multiple layers, so it is the only one carrying waypoints.
-  let assert [waypoints] =
+  // one whose endpoints sit more than one layer apart.
+  let assert [#(from, to, c1, c2)] =
     graph.get_edges(laid_out)
     |> list.filter_map(fn(e) {
-      case e.label {
-        option.Some(#(_label, [_, ..] as points)) -> Ok(points)
-        _ -> Error(Nil)
+      let assert Ok(from) = dict.get(positions, e.from)
+      let assert Ok(to) = dict.get(positions, e.to)
+      case e.label, to.1 - from.1 > 1 {
+        option.Some(#(_label, #(c1, c2))), True -> Ok(#(from, to, c1, c2))
+        _, _ -> Error(Nil)
       }
     })
 
-  // It spans three layers, so it carries two waypoints, and every waypoint
-  // lands on the same column.
-  let chain_xs = list.map(waypoints, fn(point) { point.0 })
-  assert chain_xs != []
-  assert set.size(set.from_list(chain_xs)) == 1
+  // Endpoints and both control points all land on the same column.
+  let xs = [from.0, c1.0, c2.0, to.0]
+  assert set.size(set.from_list(xs)) == 1
+
+  // It spans three layers, so the control points are the two virtual
+  // vertices routing it, one per intermediate layer.
+  assert c1.1 == from.1 + 1
+  assert c2.1 == to.1 - 1
 }
