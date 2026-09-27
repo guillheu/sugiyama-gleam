@@ -106,3 +106,20 @@ pub fn get_sources(
   graph.get_nodes(graph)
   |> list.filter(fn(vertex) { set.is_empty(vertex.incoming) })
 }
+
+/// Lift the self-loops out of `graph`, returning them alongside the graph
+/// they came from.
+///
+/// A self-loop cannot be part of a layered drawing: it spans no layers and
+/// has no second endpoint to point at. Worse, it is the one edge that
+/// cycle-breaking cannot fix — reversing `A -> A` gives back `A -> A` — so
+/// left in place it keeps `A` off every list of sources forever, and
+/// `layering` silently drops A's whole component to layer 0. Pulling the
+/// loops out before layout avoids both problems; they are reattached at
+/// the end by `control_points.add_self_loops`.
+pub fn partition_self_loops(
+  graph g: graph.Graph(key, value, label),
+) -> #(List(edge.Edge(key, label)), graph.Graph(key, value, label)) {
+  let self_loops = graph.get_edges(g) |> list.filter(fn(e) { e.from == e.to })
+  #(self_loops, list.fold(self_loops, g, graph.remove_edge))
+}

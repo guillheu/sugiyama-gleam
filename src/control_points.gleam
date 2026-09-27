@@ -69,6 +69,32 @@ pub fn route(g: Laid(key, value, label)) -> Routed(key, value, label) {
   })
 }
 
+/// Reattach the self-loops that `graph_utils.partition_self_loops` lifted
+/// out before layout.
+///
+/// A self-loop has no span to route, so it gets control points that bulge
+/// one column right and one layer down from the vertex it sits on. That
+/// keeps it the same `source -> c1 -> c2 -> target` cubic as every other
+/// edge — here a small loop below and to the right of the vertex — rather
+/// than a degenerate zero-length line.
+///
+/// A loop on a vertex that is not in the graph is dropped.
+pub fn add_self_loops(
+  g: Routed(key, value, label),
+  self_loops: List(edge.Edge(key, label)),
+) -> Routed(key, value, label) {
+  list.fold(self_loops, g, fn(acc, e) {
+    case graph.get_node(acc, e.from) {
+      Error(_) -> acc
+      Ok(n) -> {
+        let #(_, layer, x) = n.value
+        let controls = #(#(x + 1, layer), #(x + 1, layer + 1))
+        insert_edge(acc, e.from, e.to, #(e.label, controls), e.weight)
+      }
+    }
+  })
+}
+
 // The two control points for an edge: the ends of its virtual-vertex
 // chain, or — for a short edge, which has no chain — two points spaced
 // evenly along the straight line joining its endpoints.
